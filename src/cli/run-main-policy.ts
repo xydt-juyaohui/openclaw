@@ -4,6 +4,7 @@ import {
   normalizeOptionalLowercaseString,
 } from "@openclaw/normalization-core/string-coerce";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import { consumeRootOptionToken, FLAG_TERMINATOR } from "../infra/cli-root-options.js";
 import {
   resolveManifestCommandAliasOwnerInRegistry,
   resolveManifestToolOwnerInRegistry,
@@ -37,44 +38,33 @@ function isBareParentDefaultHelpArgv(argv: string[]): boolean {
 
 export function rewriteUpdateFlagArgv(argv: string[]): string[] {
   // Preserve the old root --update spelling by rewriting before Commander registration.
-  // Only rewrite --update when it appears as a root-level flag: before any subcommand
-  // and before the -- positional argument terminator.
-  const dashDashIndex = argv.indexOf("--");
+  // Only rewrite --update while scanning the root-option prefix; once a command
+  // or `--` appears, later --update tokens belong to that command's arguments.
   const updateIndex = argv.indexOf("--update");
   if (updateIndex === -1) {
     return argv;
   }
 
-  // If --update appears after --, it is a positional value, not a root flag.
-  if (dashDashIndex !== -1 && updateIndex > dashDashIndex) {
-    return argv;
-  }
-
-  // Check if a subcommand appears before --update.
-  // Track --flag value pairs so flag values (e.g. "p" in "--profile p") are not
-  // mistaken for subcommands.
-  for (let i = 2; i < updateIndex; i++) {
+  for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === undefined) continue;
-    // Non-flag argument before --update → a subcommand is present.
+    if (!arg || arg === FLAG_TERMINATOR) {
+      return argv;
+    }
+    if (i === updateIndex) {
+      const next = [...argv];
+      next.splice(updateIndex, 1, "update");
+      return next;
+    }
+    const consumed = consumeRootOptionToken(argv, i);
+    if (consumed > 0) {
+      i += consumed - 1;
+      continue;
+    }
     if (!arg.startsWith("-")) {
       return argv;
     }
-    // --flag=value form: a flag, not a subcommand.
-    if (arg.startsWith("--") && arg.includes("=")) continue;
-    // --flag without =: the next argument may be its value.
-    // Only skip it when it looks like a value (does not start with -).
-    if (arg.startsWith("--") && arg !== "--") {
-      const next = argv[i + 1];
-      if (next !== undefined && !next.startsWith("-")) {
-        i++; // skip the flag's value
-      }
-    }
   }
-
-  const next = [...argv];
-  next.splice(updateIndex, 1, "update");
-  return next;
+  return argv;
 }
 
 export function shouldEnsureCliPath(argv: string[]): boolean {
