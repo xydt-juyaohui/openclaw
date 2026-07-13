@@ -29,10 +29,13 @@ export function isCliRuntimeProvider(
   }).includes(normalized);
 }
 
-export function isCliRuntimeAlias(runtime: string | undefined): boolean {
+export function isCliRuntimeAlias(
+  runtime: string | undefined,
+  params: { config?: OpenClawConfig; env?: NodeJS.ProcessEnv; includeSetupRegistry?: boolean } = {},
+): boolean {
   const normalized = normalizeProviderId(runtime ?? "");
   return normalized
-    ? listCliRuntimeModelBackendBindings().some((binding) => binding.runtime === normalized)
+    ? listCliRuntimeModelBackendBindings(params).some((binding) => binding.runtime === normalized)
     : false;
 }
 

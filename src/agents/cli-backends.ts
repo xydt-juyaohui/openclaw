@@ -226,6 +226,24 @@ export function listCliRuntimeModelBackendBindings(
       });
     }
   }
+  // Include config-defined CLI backends so callers like isCliRuntimeAlias
+  // and isCliRuntimeProvider recognize custom cliBackends entries.
+  if (params.config) {
+    const configured = params.config.agents?.defaults?.cliBackends ?? {};
+    for (const [id, backendConfig] of Object.entries(configured)) {
+      if (!backendConfig.command?.trim()) {
+        continue;
+      }
+      const normalizedId = normalizeBackendKey(id);
+      if (!normalizedId) {
+        continue;
+      }
+      const key = `config:${normalizedId}`;
+      if (!bindings.has(key)) {
+        bindings.set(key, { provider: normalizedId, runtime: normalizedId });
+      }
+    }
+  }
   return [...bindings.values()].toSorted((left, right) =>
     left.provider === right.provider
       ? left.runtime.localeCompare(right.runtime)
@@ -308,17 +326,27 @@ export function resolveCliRuntimeModelBackendBinding(params: {
     config: params.config,
     env: params.env,
   });
-  if (!setupBackend) {
-    return undefined;
-  }
-  const setupProvider = resolveCliBackendModelProvider(setupBackend.backend);
-  return setupProvider === provider
-    ? {
+  if (setupBackend) {
+    const setupProvider = resolveCliBackendModelProvider(setupBackend.backend);
+    if (setupProvider === provider) {
+      return {
         provider,
         runtime,
         ...(setupBackend.pluginId ? { pluginId: setupBackend.pluginId } : {}),
-      }
-    : undefined;
+      };
+    }
+  }
+  // Fallback: check config-defined CLI backends so custom cliBackends
+  // entries are recognized by isCliRuntimeAliasForProvider and the
+  // harness selection path.
+  if (params.config) {
+    const configured = params.config.agents?.defaults?.cliBackends ?? {};
+    const configBackend = pickBackendConfig(configured, runtime);
+    if (configBackend?.command?.trim()) {
+      return { provider, runtime };
+    }
+  }
+  return undefined;
 }
 
 /** Checks whether a runtime is registered to serve a model provider. */

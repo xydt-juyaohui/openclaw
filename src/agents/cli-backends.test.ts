@@ -15,6 +15,9 @@ import {
   testing as cliBackendsTesting,
   resolveCliBackendConfig,
   resolveCliBackendLiveTest,
+  listCliRuntimeModelBackendBindings,
+  resolveCliRuntimeModelBackendBinding,
+  isCliRuntimeModelBackendForProvider,
 } from "./cli-backends.js";
 
 type RuntimeBackendEntry = ReturnType<
@@ -1191,5 +1194,127 @@ describe("resolveCliBackendConfig alias precedence", () => {
 
     expect(resolved?.config.command).toBe("kimi-canonical");
     expect(resolved?.config.args).toEqual(["--canonical"]);
+  });
+});
+
+describe("listCliRuntimeModelBackendBindings with config-defined backends", () => {
+  it("includes config-defined CLI backends with a command in the bindings list", () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          cliBackends: {
+            "claude-cli-max": {
+              command: "~/.local/bin/claude",
+              args: ["-p", "--output-format", "stream-json"],
+            },
+          },
+        },
+      },
+    } satisfies OpenClawConfig;
+
+    const bindings = listCliRuntimeModelBackendBindings({ config: cfg });
+    const customBinding = bindings.find((b) => b.runtime === "claude-cli-max");
+
+    expect(customBinding).toBeDefined();
+    expect(customBinding?.provider).toBe("claude-cli-max");
+    expect(customBinding?.runtime).toBe("claude-cli-max");
+  });
+
+  it("skips config-defined backends without a command", () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          cliBackends: {
+            "incomplete-cli": {
+              args: ["-p"],
+            },
+          },
+        },
+      },
+    } satisfies OpenClawConfig;
+
+    const bindings = listCliRuntimeModelBackendBindings({ config: cfg });
+    const customBinding = bindings.find((b) => b.runtime === "incomplete-cli");
+
+    expect(customBinding).toBeUndefined();
+  });
+
+  it("does not add config backends when no config is provided", () => {
+    // Ensure that without config, only plugin-registered backends are returned.
+    const bindings = listCliRuntimeModelBackendBindings();
+    const customBinding = bindings.find((b) => b.runtime === "claude-cli-max");
+
+    expect(customBinding).toBeUndefined();
+  });
+});
+
+describe("resolveCliRuntimeModelBackendBinding with config-defined backends", () => {
+  it("resolves a binding for a config-defined backend when runtime matches", () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          cliBackends: {
+            "claude-cli-max": {
+              command: "~/.local/bin/claude",
+              args: ["-p"],
+            },
+          },
+        },
+      },
+    } satisfies OpenClawConfig;
+
+    const binding = resolveCliRuntimeModelBackendBinding({
+      provider: "anthropic",
+      runtime: "claude-cli-max",
+      config: cfg,
+    });
+
+    expect(binding).toBeDefined();
+    expect(binding?.runtime).toBe("claude-cli-max");
+  });
+
+  it("returns undefined for config backends without a command", () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          cliBackends: {
+            "incomplete-cli": {
+              args: ["-p"],
+            },
+          },
+        },
+      },
+    } satisfies OpenClawConfig;
+
+    const binding = resolveCliRuntimeModelBackendBinding({
+      provider: "anthropic",
+      runtime: "incomplete-cli",
+      config: cfg,
+    });
+
+    expect(binding).toBeUndefined();
+  });
+
+  it("isCliRuntimeModelBackendForProvider recognises config-defined backends", () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          cliBackends: {
+            "claude-cli-max": {
+              command: "~/.local/bin/claude",
+              args: ["-p"],
+            },
+          },
+        },
+      },
+    } satisfies OpenClawConfig;
+
+    const found = isCliRuntimeModelBackendForProvider({
+      provider: "anthropic",
+      runtime: "claude-cli-max",
+      config: cfg,
+    });
+
+    expect(found).toBe(true);
   });
 });
