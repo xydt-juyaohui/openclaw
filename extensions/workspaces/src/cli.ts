@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import type { Command } from "commander";
 import { addGatewayClientOptions, callGatewayFromCli } from "openclaw/plugin-sdk/gateway-runtime";
+import { parseStrictNonNegativeInteger } from "openclaw/plugin-sdk/number-runtime";
 import {
   validateWorkspaceDoc,
   type WorkspaceBinding,
@@ -59,8 +60,10 @@ function parseOptionalBoolean(value: string): boolean {
 }
 
 function parseWorkspaceGrid(value: string): WorkspaceGrid {
-  const parts = value.split(",").map((entry) => Number(entry.trim()));
-  if (parts.length !== 4 || parts.some((entry) => !Number.isInteger(entry))) {
+  // Reject non-decimal spellings (0x10, 1e2, "", 0b10) that Number() would
+  // silently coerce; grid cells are non-negative per validateGrid.
+  const parts = value.split(",").map((entry) => parseStrictNonNegativeInteger(entry.trim()));
+  if (parts.length !== 4 || parts.some((entry) => entry === undefined)) {
     throw new Error("grid must be x,y,w,h");
   }
   const [x, y, w, h] = parts as [number, number, number, number];

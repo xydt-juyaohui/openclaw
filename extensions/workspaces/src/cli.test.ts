@@ -350,6 +350,38 @@ describe("workspace CLI", () => {
     });
   });
 
+  it("rejects non-decimal grid spellings that Number() would silently coerce", async () => {
+    const program = createProgram();
+    // Number() would coerce each to a valid integer (0x10 -> 16, "" -> 0,
+    // 1e2 -> 100) and silently accept a different grid than the one typed.
+    const silentCoercions = [
+      "0x10,0,1,1", // hex
+      "0,0,1e2,1", // exponent
+      "1,,1,1", // empty segment coerces to 0
+      "0b1,0,1,1", // binary
+      "-1,0,1,1", // negative
+      "1.5,0,1,1", // fractional
+    ];
+    for (const grid of silentCoercions) {
+      await expect(
+        program.parseAsync(
+          [
+            "workspaces",
+            "widgets",
+            "add",
+            "--tab",
+            "ops",
+            "--kind",
+            "builtin:markdown",
+            "--grid",
+            grid,
+          ],
+          { from: "user" },
+        ),
+      ).rejects.toThrow("grid must be x,y,w,h");
+    }
+  });
+
   it("scaffolds operator widgets as pending and approves them through the approvals method", async () => {
     await withTempStateDir(async (stateDir) => {
       const store = new WorkspaceStore({ stateDir });
