@@ -45,6 +45,18 @@ function buildSystemAgentPresentation(request: {
 // Matches a high UTF-16 surrogate with no paired low surrogate following it.
 const LONE_HIGH_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u;
 
+// buildApprovalPresentation returns a kind-tagged union; narrow to the
+// system-agent variant before reading its title/description.
+function systemAgentText(
+  presentation: ReturnType<typeof buildSystemAgentPresentation>,
+  field: "title" | "description",
+): string {
+  if (!presentation || presentation.kind !== "system-agent") {
+    throw new Error("expected a system-agent presentation");
+  }
+  return presentation[field];
+}
+
 describe("buildApprovalPresentation", () => {
   it("sanitizes exec routing metadata and preserves empty values as null", () => {
     const githubToken = `ghp_${"a".repeat(100)}`;
@@ -142,8 +154,8 @@ describe("buildApprovalPresentation (system-agent)", () => {
     const title = `${"a".repeat(79)}\u{1F600}`;
     const presentation = buildSystemAgentPresentation({ title, description: "d" });
     expect(presentation).not.toBeNull();
-    expect(LONE_HIGH_SURROGATE.test(presentation?.title ?? "")).toBe(false);
-    expect(presentation?.title).toBe("a".repeat(79));
+    expect(LONE_HIGH_SURROGATE.test(systemAgentText(presentation, "title"))).toBe(false);
+    expect(systemAgentText(presentation, "title")).toBe("a".repeat(79));
   });
 
   it("keeps an emoji that fits within the title limit intact", () => {
@@ -151,8 +163,8 @@ describe("buildApprovalPresentation (system-agent)", () => {
     const title = `${"a".repeat(78)}\u{1F600}`;
     const presentation = buildSystemAgentPresentation({ title, description: "d" });
     expect(presentation).not.toBeNull();
-    expect(LONE_HIGH_SURROGATE.test(presentation?.title ?? "")).toBe(false);
-    expect(presentation?.title).toBe(`${"a".repeat(78)}\u{1F600}`);
+    expect(LONE_HIGH_SURROGATE.test(systemAgentText(presentation, "title"))).toBe(false);
+    expect(systemAgentText(presentation, "title")).toBe(`${"a".repeat(78)}\u{1F600}`);
   });
 
   it("drops a split emoji at the description boundary instead of leaving a lone surrogate", () => {
@@ -160,7 +172,7 @@ describe("buildApprovalPresentation (system-agent)", () => {
     const description = `${"a".repeat(511)}\u{1F6E1}`;
     const presentation = buildSystemAgentPresentation({ title: "t", description });
     expect(presentation).not.toBeNull();
-    expect(LONE_HIGH_SURROGATE.test(presentation?.description ?? "")).toBe(false);
-    expect(presentation?.description).toBe("a".repeat(511));
+    expect(LONE_HIGH_SURROGATE.test(systemAgentText(presentation, "description"))).toBe(false);
+    expect(systemAgentText(presentation, "description")).toBe("a".repeat(511));
   });
 });
