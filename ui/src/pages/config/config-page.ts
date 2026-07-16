@@ -114,10 +114,8 @@ function isUnknownQuickAutomationMethodError(error: unknown): boolean {
 }
 
 export function supportsQuickAutomation(hello: ApplicationGatewaySnapshot["hello"]): boolean {
-  return (
-    hello?.features?.methods?.includes("cron.list") === true &&
-    hello?.features?.methods?.includes("skills.status") === true
-  );
+  const methods = hello?.features?.methods;
+  return Boolean(methods?.includes("cron.list") && methods?.includes("skills.status"));
 }
 
 function defaultConfigSelection(pageId: ConfigPageId): ConfigSelection {
