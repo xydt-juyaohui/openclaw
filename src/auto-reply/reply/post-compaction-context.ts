@@ -7,18 +7,17 @@ import { truncateUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
 import { resolveAgentContextLimits } from "../../agents/agent-scope.js";
 import { resolveCronStyleNow } from "../../agents/current-time.js";
 import { formatDateStamp, resolveUserTimezone } from "../../agents/date-time.js";
+import {
+  MAX_WORKSPACE_BOOTSTRAP_FILE_BYTES,
+  readWorkspaceBootstrapFile,
+} from "../../agents/workspace-bootstrap-read.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { openRootFile } from "../../infra/boundary-file-read.js";
-import { readFileDescriptorBoundedSync } from "../../infra/file-descriptor-read.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 
 const log = createSubsystemLogger("post-compaction-context");
 
 const MAX_CONTEXT_CHARS = 1800;
-// AGENTS.md is workspace bootstrap documentation. Bound the post-compaction read so a
-// pathologically large file cannot trigger an unbounded allocation at compaction time.
-// Aligns with the 2 MiB workspace bootstrap file limit used for other workspace reads.
-const POST_COMPACTION_AGENTS_MD_MAX_BYTES = 2 * 1024 * 1024;
 const DEFAULT_POST_COMPACTION_SECTIONS = ["Session Startup", "Red Lines"];
 const LEGACY_POST_COMPACTION_SECTIONS = ["Every Session", "Safety"];
 
@@ -70,6 +69,10 @@ export async function readPostCompactionContext(
   const cfg = options?.cfg;
   const agentId = options?.agentId;
   const effectiveNowMs = options?.nowMs;
+  const configuredSections = cfg?.agents?.defaults?.compaction?.postCompactionSections;
+  if (!Array.isArray(configuredSections) || configuredSections.length === 0) {
+    return null;
+  }
   const agentsPath = path.join(workspaceDir, "AGENTS.md");
 
   try {
@@ -81,32 +84,21 @@ export async function readPostCompactionContext(
     if (!opened.ok) {
       return null;
     }
-    const content = (() => {
-      try {
-        return readFileDescriptorBoundedSync(
-          opened.fd,
-          POST_COMPACTION_AGENTS_MD_MAX_BYTES,
-        ).toString("utf-8");
-      } catch (err) {
-        if (err instanceof RangeError) {
-          log.warn(
-            `Ignoring oversized AGENTS.md ${agentsPath}: file exceeds the ${POST_COMPACTION_AGENTS_MD_MAX_BYTES}-byte limit`,
-          );
-          return null;
-        }
-        throw err;
-      } finally {
-        fs.closeSync(opened.fd);
+    let content: string;
+    try {
+      content = await readWorkspaceBootstrapFile(opened.fd);
+    } catch (err) {
+      if (err instanceof RangeError) {
+        log.warn(
+          `Ignoring oversized AGENTS.md ${agentsPath}: file exceeds the ${MAX_WORKSPACE_BOOTSTRAP_FILE_BYTES}-byte limit`,
+        );
+        return null;
       }
-    })();
-    if (content === null) {
-      return null;
+      throw err;
+    } finally {
+      fs.closeSync(opened.fd);
     }
 
-    const configuredSections = cfg?.agents?.defaults?.compaction?.postCompactionSections;
-    if (!Array.isArray(configuredSections) || configuredSections.length === 0) {
-      return null;
-    }
     const sectionNames = configuredSections;
 
     const foundSectionNames: string[] = [];
