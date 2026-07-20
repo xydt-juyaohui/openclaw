@@ -95,8 +95,7 @@ export const getChannelPluginMock = createMock();
 export const retireSessionMcpRuntimeMock = createMock();
 export const callGatewayMock = createMock();
 export const ensureRuntimePluginsLoadedMock = createMock();
-export const listWebSearchProvidersMock = createMock();
-export const resolveWebSearchProviderIdMock = createMock();
+export const hasUsableWebSearchProviderMock = createMock();
 export const classifyEmbeddedAgentRunResultForModelFallbackMock = createMock();
 export const mergeEmbeddedAgentRunResultForModelFallbackExhaustionMock = createMock();
 
@@ -115,7 +114,7 @@ const supportsXHighThinkingMock = createMock();
 const resolveSessionTranscriptPathMock = createMock();
 const setSessionRuntimeModelMock = createMock();
 const registerAgentRunContextMock = createMock();
-const buildSafeExternalPromptMock = createMock();
+export const buildSafeExternalPromptMock = createMock();
 const detectSuspiciousPatternsMock = createMock();
 const mapHookExternalContentSourceMock = createMock();
 const isExternalHookSessionMock = createMock();
@@ -179,7 +178,7 @@ vi.mock("./run-context.runtime.js", () => ({
 }));
 
 vi.mock("./run-model-catalog.runtime.js", () => ({
-  loadModelCatalog: loadModelCatalogMock,
+  loadPreparedModelCatalog: loadModelCatalogMock,
 }));
 
 vi.mock("../../plugins/runtime-plugins.runtime.js", () => ({
@@ -187,8 +186,7 @@ vi.mock("../../plugins/runtime-plugins.runtime.js", () => ({
 }));
 
 vi.mock("../../web-search/runtime.js", () => ({
-  listWebSearchProviders: listWebSearchProvidersMock,
-  resolveWebSearchProviderId: resolveWebSearchProviderIdMock,
+  hasUsableWebSearchProvider: hasUsableWebSearchProviderMock,
 }));
 
 vi.mock("../../skills/runtime/cron-snapshot.runtime.js", () => ({
@@ -232,7 +230,7 @@ vi.mock("../../skills/runtime/cron-snapshot.runtime.js", () => ({
 vi.mock("./run-model-selection.runtime.js", () => ({
   DEFAULT_MODEL: "gpt-5.4",
   DEFAULT_PROVIDER: "openai",
-  loadModelCatalog: loadModelCatalogMock,
+  loadPreparedModelCatalog: loadModelCatalogMock,
   getModelRefStatus: getModelRefStatusMock,
   normalizeModelSelection: normalizeModelSelectionForTest,
   resolveAllowedModelRef: resolveAllowedModelRefMock,
@@ -814,10 +812,11 @@ export function resetRunCronIsolatedAgentTurnHarness(): void {
   setSessionRuntimeModelMock.mockReturnValue(undefined);
   logWarnMock.mockReset();
   ensureRuntimePluginsLoadedMock.mockReset();
-  listWebSearchProvidersMock.mockReset();
-  listWebSearchProvidersMock.mockReturnValue([{ id: "duckduckgo" }]);
-  resolveWebSearchProviderIdMock.mockReset();
-  resolveWebSearchProviderIdMock.mockReturnValue("duckduckgo");
+  hasUsableWebSearchProviderMock.mockReset();
+  hasUsableWebSearchProviderMock.mockImplementation(
+    (params?: { runtimeWebSearch?: { selectedProvider?: string } }) =>
+      Boolean(params?.runtimeWebSearch?.selectedProvider),
+  );
 }
 
 export function clearFastTestEnv(): string | undefined {
