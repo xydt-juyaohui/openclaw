@@ -812,7 +812,7 @@ describe("CORE_HEALTH_CHECKS", () => {
       createCoreHealthChecks(
         createDeps({
           async collectWorkspaceSuggestionNotes(workspaceDir: string): Promise<readonly string[]> {
-            if (String(workspaceDir).includes("secondary")) {
+            if (workspaceDir.includes("secondary")) {
               return secondaryNotes;
             }
             return defaultAgentNotes;

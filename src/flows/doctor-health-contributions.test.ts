@@ -2176,7 +2176,7 @@ describe("doctor health contributions", () => {
       (_cfg: unknown, agentId: string) => `/tmp/openclaw-${agentId}-workspace`,
     );
     mocks.shouldSuggestMemorySystem.mockImplementation(async (workspaceDir: string) =>
-      String(workspaceDir).includes("secondary"),
+      workspaceDir.includes("secondary"),
     );
     mocks.collectWorkspaceBackupTip.mockReturnValue(undefined);
     mocks.note.mockReset();
